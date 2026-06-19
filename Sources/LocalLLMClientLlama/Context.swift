@@ -44,6 +44,16 @@ public final class Context: @unchecked Sendable {
         ctx_params.n_threads = Int32(parameter.numberOfThreads ?? max(1, min(8, ProcessInfo.processInfo.processorCount - 2)))
         ctx_params.n_threads_batch = ctx_params.n_threads
 
+        // NeuraChat (fork): KV cache en q8_0 (la mitad de RAM/ancho de banda que
+        // f16) + flash-attention forzado (la V-cache cuantizada lo requiere). Baja
+        // calor y RAM y permite contextos más largos a igualdad de coste. Los
+        // modelos GGUF estándar (Qwen/Llama/Gemma/Phi/Mistral) lo soportan en
+        // Metal; si un modelo exótico fallara al crear el contexto, se captura como
+        // error de carga (no como crash).
+        ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED
+        ctx_params.type_k = GGML_TYPE_Q8_0
+        ctx_params.type_v = GGML_TYPE_Q8_0
+
         self.parameter = parameter
         self.pauseHandler = PauseHandler(disableAutoPause: parameter.options.disableAutoPause)
         self.model = try Model(url: url)
