@@ -67,8 +67,15 @@ public class MultimodalContext: @unchecked Sendable {
             return mtmd_tokenize(multimodalContext, chunks, &text, &bitmaps, bitmapCount)
         }
 
+        // El CODIGO de mtmd va en el mensaje. `mtmd_tokenize` devuelve 1 por
+        // descuadre de marcadores y 2 porque el modelo no admite vision o el
+        // preprocesador rechazo la imagen: son causas completamente distintas y
+        // el texto a secas las confundia. El mensaje que las separa lo imprime
+        // el logger propio de clip, que en iOS va a stderr y se pierde.
         guard status == 0 else {
-            throw .failedToLoad(reason: "Failed to tokenize bitmap")
+            throw .failedToLoad(
+                reason: "Failed to tokenize bitmap (mtmd=\(status), bitmaps=\(bitmapCount))"
+            )
         }
 
         return MultimodalChunks(chunks: chunks)
