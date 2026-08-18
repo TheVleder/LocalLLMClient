@@ -40,11 +40,25 @@ public class MultimodalContext: @unchecked Sendable {
         let chunks = mtmd_input_chunks_init()!
 
         let textStorage = "    \(String(cString: mtmd_default_marker()))    " // spaces for the workaround of tokenizer
-        var text = textStorage.withCString {
-            mtmd_input_text(text: $0, add_special: false, parse_special: true)
+
+        // NeuraChat (fork): `mtmd_tokenize` se llama DENTRO de `withCString`.
+        //
+        // El puntero que entrega `withCString` solo es válido mientras dura el
+        // closure. Antes se construía ahí el `mtmd_input_text` y se devolvía
+        // FUERA, así que para cuando `mtmd_tokenize` leía `text.text` el puntero
+        // ya colgaba: C no encontraba el marcador `<__media__>`, contaba cero
+        // marcadores contra un bitmap y devolvía 1 → "Failed to tokenize bitmap".
+        //
+        // Es comportamiento indefinido, así que a veces "funciona" (la memoria
+        // de pila sigue intacta por suerte) y a veces no. En un build Release
+        // con -O para iOS fallaba SIEMPRE: la visión local no funcionaba nunca,
+        // con cualquier modelo y cualquier imagen.
+        let status = textStorage.withCString { cString -> Int32 in
+            var text = mtmd_input_text(text: cString, add_special: false, parse_special: true)
+            return mtmd_tokenize(multimodalContext, chunks, &text, &bitmaps, bitmaps.count)
         }
 
-        guard mtmd_tokenize(multimodalContext, chunks, &text, &bitmaps, bitmaps.count) == 0 else {
+        guard status == 0 else {
             throw .failedToLoad(reason: "Failed to tokenize bitmap")
         }
 
