@@ -53,9 +53,18 @@ public class MultimodalContext: @unchecked Sendable {
         // de pila sigue intacta por suerte) y a veces no. En un build Release
         // con -O para iOS fallaba SIEMPRE: la visión local no funcionaba nunca,
         // con cualquier modelo y cualquier imagen.
+        // `bitmapCount` se saca FUERA a proposito. En la misma llamada convivian
+        // `&bitmaps` (acceso de modificacion, porque el parametro C es
+        // `const mtmd_bitmap **`: el const esta en el pointee, no en el puntero)
+        // y `bitmaps.count` (lectura). A nivel de funcion Swift lo aceptaba, pero
+        // dentro de un closure la variable pasa a estar CAPTURADA y la
+        // exclusividad puede comprobarse en EJECUCION: seria cambiar un fallo
+        // por un trap. Con el recuento ya resuelto, dentro del closure solo
+        // queda un acceso y no hay solapamiento posible.
+        let bitmapCount = bitmaps.count
         let status = textStorage.withCString { cString -> Int32 in
             var text = mtmd_input_text(text: cString, add_special: false, parse_special: true)
-            return mtmd_tokenize(multimodalContext, chunks, &text, &bitmaps, bitmaps.count)
+            return mtmd_tokenize(multimodalContext, chunks, &text, &bitmaps, bitmapCount)
         }
 
         guard status == 0 else {
